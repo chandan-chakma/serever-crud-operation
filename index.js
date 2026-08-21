@@ -1,18 +1,17 @@
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+require('dotenv').config()
 const express = require('express');
 const cors =require('cors')
 const app = express();
-
+// console.log(process.env)/
 const port = process.env.PORT || 3000;
 
 // MiddleWare
 app.use(cors());
 app.use(express.json());
-// ProductDBUser
-// XVpurH9OBzQevvlL
-// mongodb datababse 
-const uri = "mongodb+srv://ProductDBUser:XVpurH9OBzQevvlL@cluster0.l05lfvs.mongodb.net/?appName=Cluster0";
+
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.l05lfvs.mongodb.net/?appName=Cluster0`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
@@ -132,11 +131,18 @@ async function run() {
 
 
         app.get('/bids', async (req, res) => {
+            const cursor = bidsCollection.find();
+            const result = await cursor.toArray()
+            res.send(result)
+        })
+
+
+        app.get('/bids', async (req, res) => {
             // console.log("heleo",req.query.email)
             const email = req.query.email
             // console.log('email',email)
             const query={}
-            if (email) {
+            if (query.email) {
                 query.buyer_email = email;
             }
             // const emailFind= await bidsCollection.find(query).toArray()
@@ -144,6 +150,7 @@ async function run() {
             const result = await cursor.toArray();
             res.send(result);
         })
+
         app.get('/products/bids/:productId', async(req, res)=> {
             const productId = req.params.productId;console.log(productId)
             const query = { product: productId }
@@ -156,6 +163,7 @@ async function run() {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await bidsCollection.deleteOne(query);
+            // console.log(qu)
             res.send(result)
         })
 
