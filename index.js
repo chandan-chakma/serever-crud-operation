@@ -6,7 +6,7 @@ const cors =require('cors')
 const app = express();
 // console.log(process.env)/
 const port = process.env.PORT || 3000;
-
+const jwt = require('jsonwebtoken');
 // MiddleWare
 app.use(cors());
 app.use(express.json());
@@ -17,70 +17,96 @@ const logger = (req, res, next) => {
     return next()
 }
 
-// const admin = require("firebase-admin");
-// const serviceAccount = require("./token-verify.json");
-
-// admin.initializeApp({
-//     credential: admin.cert(serviceAccount)
-// });
-// console.log(admin.initializeApp)
-// console.log(admin.initializeApp);/
-// admin.auth/
+// firebase verify jwt token 
 // const { initializeApp, cert } = require("firebase-admin/app");
 // const { getAuth } = require("firebase-admin/auth");
+
 // const serviceAccount = require("./token-verify.json");
 
 // initializeApp({
 //     credential: cert(serviceAccount)
+// });
+// console.log("PROJECT:", serviceAccount.project_id);
+// console.log("CLIENT EMAIL:", serviceAccount.client_email);
+// const auth = getAuth();
 
-const { cert, initializeApp } =require('firebase-admin/app');
-const  { getAuth }=require('firebase-admin/auth');
+// const verifyFireBaseToken = async (req, res, next) => {
+//     const authorization = req.headers.authorization;
 
-const serviceAccount = require("./token-verify.json");
+//     console.log("AUTHORIZATION:", authorization);
 
-initializeApp({
-    credential: cert(serviceAccount)
-});
+//     if (!authorization) {
+//         return res.status(401).send({
+//             message: "No authorization header"
+//         });
+//     }
 
-const auth = getAuth();
+//     const token = authorization.split(" ")[1];
 
-const verifyFBToken = async (req, res, next) => {
+//     console.log("TOKEN EXISTS:", !!token);
+//     console.log("TOKEN LENGTH:", token?.length);
 
-    const authHeader = req.headers.authorization;
+//     try {
+//         const decoded = await auth.verifyIdToken(token);
 
-    if (!authHeader) {
+//         console.log("✅ TOKEN VERIFIED");
+//         console.log("UID:", decoded.uid);
+//         console.log("EMAIL:", decoded.email);
+
+//         req.token_email = decoded.email;
+        
+//         next();
+
+//     } catch (error) {
+//         console.log("❌ TOKEN VERIFICATION FAILED");
+//         console.log("CODE:", error.code);
+//         console.log("MESSAGE:", error.message);
+
+//         return res.status(401).send({
+//             message: "unauthorized access"
+//         });
+//     }
+// };
+    // next()
+    
+// my ownn jwt token 
+const veriFyToken = (req, res, next) => {
+    // console.log("middleware", req.headers.authorization);
+    const authorization = req.headers.authorization;
+    if (!authorization) {
         return res.status(401).send({
-            message: "No authorization header"
-        });
+            message: 'uuAUthorize Access'
+        })
     }
+    const token = authorization.split(' ')[1];
+    console.log('second token',token)
 
-    const token = authHeader.split(" ")[1];
-
-    try {
-        const decodedToken = await auth.verifyIdToken(token);
-
-        console.log("✅ Firebase user:", decodedToken);
-
-        req.user = decodedToken;
+    if (!token) {
+        return res.status(403).send({
+            message:'Forbiden Access'
+        })
+    }
+    jwt.verify(token, process.env.JWT_secret, (err, decoded) => {
+        if (err) {
+            // console.log(err)
+            return res.status(401).send({
+                message:'Unauthorize Access'
+            })
+           
+        }
+        req.token_email=decoded.email
+        console.log("after decode",decoded)
 
         next();
 
-    } catch (error) {
-        console.log("❌ FIREBASE VERIFY FAILED");
-        console.log("CODE:", error.code);
-        console.log("MESSAGE:", error.message);
-
-        return res.status(401).send({
-            message: "Firebase token verification failed",
-            error: error.message
-        });
-    }
-};
-
-    
-    // next()
+    })
+   
     
 
+   
+        
+    
+}
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.l05lfvs.mongodb.net/?appName=Cluster0`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -113,7 +139,7 @@ async function run() {
         app.post('/users', async (req, res) => {
             const newUser = req.body;
             const email = req.body.email;
-            console.log(email)
+            console.log(email);
             const query = { email }
             const existingUser = await userCollection.findOne(query)
             if (existingUser) {
@@ -127,6 +153,15 @@ async function run() {
                 res.send(result);
             }
            
+        })
+
+        // jwt data 
+        app.post('/getToken', (req, res) => {
+            const loggedUser = req.body;
+            console.log('logguser',loggedUser)
+            const token = jwt.sign(loggedUser, process.env.JWT_secret, { expiresIn: '1h' })
+            console.log('first token',token)
+            res.send({token:token})
         })
 
 
@@ -208,22 +243,50 @@ async function run() {
         // })
 
 
-        app.get('/bids',logger, verifyFBToken, async (req, res) => {
-            
-            // console.log("heleo",req.query.email)
-            const email = req.query.email
-            // console.log('email',email)/
-            const query={}
+        // using jwt library or my own jwt Token 
+        app.get('/bids', veriFyToken, async(req, res) => {
+            // console.log('headers',req.headers)
+            const email = req.query.email;
+            const query = {}
             if (email) {
                 query.buyer_email = email;
             }
-            // console.log(query)
-            // console.log(req.headers)
-            // const emailFind= await bidsCollection.find(query).toArray()
+
+            // verify whoes email have access 
+            if (email !== req.token_email) {
+                return res.status(403).send({
+                    message:'Forbidden Access'
+                })
+                
+            }
+
             const cursor = bidsCollection.find(query);
             const result = await cursor.toArray();
-            res.send(result);
+            res.send(result)
         })
+
+            // bids with firebase jwt Token 
+        // app.get('/bids',logger, verifyFireBaseToken, async (req, res) => {
+            
+        //     // console.log("heleo",req.query.email)
+        //     const email = req.query.email
+        //     // console.log('email',email)/
+        //     const query={}
+        //     if (email) {
+        //         if (email !== req.token_email) {
+        //             return res.status(401).send({
+        //                 message:"unauthorize access"
+        //             })
+        //         }
+        //         query.buyer_email = email;
+        //     }
+        //     // console.log(query)
+        //     // console.log(req.headers)
+        //     // const emailFind= await bidsCollection.find(query).toArray()
+        //     const cursor = bidsCollection.find(query);
+        //     const result = await cursor.toArray();
+        //     res.send(result);
+        // })
 
         app.get('/products/bids/:productId', async(req, res)=> {
             const productId = req.params.productId;console.log(productId)
@@ -242,7 +305,7 @@ async function run() {
         })
 
 
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
     }
