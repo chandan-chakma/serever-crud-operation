@@ -1,2 +1,4 @@
 node_modules/
 .env
+token-verify.json
+server-client-mongo-firebase-adminsdk-*.json

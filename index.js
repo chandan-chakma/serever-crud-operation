@@ -11,6 +11,77 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+
+const logger = (req, res, next) => {
+    console.log('logging info');
+    return next()
+}
+
+// const admin = require("firebase-admin");
+// const serviceAccount = require("./token-verify.json");
+
+// admin.initializeApp({
+//     credential: admin.cert(serviceAccount)
+// });
+// console.log(admin.initializeApp)
+// console.log(admin.initializeApp);/
+// admin.auth/
+// const { initializeApp, cert } = require("firebase-admin/app");
+// const { getAuth } = require("firebase-admin/auth");
+// const serviceAccount = require("./token-verify.json");
+
+// initializeApp({
+//     credential: cert(serviceAccount)
+
+const { cert, initializeApp } =require('firebase-admin/app');
+const  { getAuth }=require('firebase-admin/auth');
+
+const serviceAccount = require("./token-verify.json");
+
+initializeApp({
+    credential: cert(serviceAccount)
+});
+
+const auth = getAuth();
+
+const verifyFBToken = async (req, res, next) => {
+
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+        return res.status(401).send({
+            message: "No authorization header"
+        });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decodedToken = await auth.verifyIdToken(token);
+
+        console.log("✅ Firebase user:", decodedToken);
+
+        req.user = decodedToken;
+
+        next();
+
+    } catch (error) {
+        console.log("❌ FIREBASE VERIFY FAILED");
+        console.log("CODE:", error.code);
+        console.log("MESSAGE:", error.message);
+
+        return res.status(401).send({
+            message: "Firebase token verification failed",
+            error: error.message
+        });
+    }
+};
+
+    
+    // next()
+    
+
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.l05lfvs.mongodb.net/?appName=Cluster0`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -130,21 +201,24 @@ async function run() {
         })
 
 
-        app.get('/bids', async (req, res) => {
-            const cursor = bidsCollection.find();
-            const result = await cursor.toArray()
-            res.send(result)
-        })
+        // app.get('/bids', async (req, res) => {
+        //     const cursor = bidsCollection.find();
+        //     const result = await cursor.toArray()
+        //     res.send(result)
+        // })
 
 
-        app.get('/bids', async (req, res) => {
+        app.get('/bids',logger, verifyFBToken, async (req, res) => {
+            
             // console.log("heleo",req.query.email)
             const email = req.query.email
-            // console.log('email',email)
+            // console.log('email',email)/
             const query={}
-            if (query.email) {
+            if (email) {
                 query.buyer_email = email;
             }
+            // console.log(query)
+            // console.log(req.headers)
             // const emailFind= await bidsCollection.find(query).toArray()
             const cursor = bidsCollection.find(query);
             const result = await cursor.toArray();
