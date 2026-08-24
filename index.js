@@ -199,7 +199,7 @@ async function run() {
 
 
 
-        app.post('/products', async(req, res) => {
+        app.post('/products', veriFyToken, async(req, res) => {
             const newProduct = req.body;
             const result = await productCollection.insertOne(newProduct);
             res.send(result)
